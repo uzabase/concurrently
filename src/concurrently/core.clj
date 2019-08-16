@@ -13,10 +13,10 @@
          result-ch# ~result-ch
          timeout-ms# ~timeout-ms]
      (if (= timeout-ms# :no-timeout)
-       ;; timeout設定なし
+       ;; There are no timeout setting.
        (<! result-ch#)
 
-       ;; read timeout有効
+       ;; read-timeout active.
        (alt!
          result-ch#
          ([value#]
@@ -168,27 +168,6 @@
 
       (->ConcurrentJob next-ch transaction-id))))
 
-(defn handle-results
-  [ch & [{close-fn :close finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
-  @(<!! (go
-         (try
-           (loop [results []]
-             (log/debug "handle-results loop")
-             (if-let [item (take-or-throw! ch timeout-ms context-name)]
-               (recur (conj results @item))
-               (box/success results)))
-           (catch Throwable ex
-             (log/debug "close")
-             (when close-fn
-               (close-fn))
-             (box/failure ex))
-           (finally
-             (log/debug "finally")
-             ;; 最後まで読み切る
-             (cleanup-in-background ch)
-             (when finally-fn
-               (finally-fn)))))))
-
 (defn- make-process-context
   [input-ch]
   {:input-ch input-ch})
@@ -249,3 +228,23 @@
   ;; Return a Process Context
   (make-process-context input-ch))
 
+
+(defn handle-results
+  [ch & [{close-fn :close finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
+  @(<!! (go
+          (try
+            (loop [results []]
+              (log/debug "handle-results loop")
+              (if-let [item (take-or-throw! ch timeout-ms context-name)]
+                (recur (conj results @item))
+                (box/success results)))
+            (catch Throwable ex
+              (log/debug "close")
+              (when close-fn
+                (close-fn))
+              (box/failure ex))
+            (finally
+              (log/debug "finally")
+              (cleanup-in-background ch)
+              (when finally-fn
+                (finally-fn)))))))
