@@ -111,7 +111,7 @@
    (->ConcurrentJob channel nil)))
 
 (defn concurrently
-  [{:keys [input-ch] :as context} options items-ch]
+  [{:keys [input-ch] :as context} items-ch options]
   (assert (some? input-ch))
 
   (if-not items-ch
@@ -230,7 +230,7 @@
 
 
 (defn get-results
-  [ch & [{close-fn :close finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
+  [ch & [{catch-fn :catch finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
   @(<!! (go
           (try
             (loop [results []]
@@ -240,8 +240,8 @@
                 (box/success results)))
             (catch Throwable ex
               (log/debug "close")
-              (when close-fn
-                (close-fn))
+              (when catch-fn
+                (catch-fn ex))
               (box/failure ex))
             (finally
               (log/debug "finally")
