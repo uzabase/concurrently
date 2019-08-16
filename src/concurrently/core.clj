@@ -229,7 +229,7 @@
   (make-process-context input-ch))
 
 
-(defn handle-results
+(defn get-results
   [ch & [{close-fn :close finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
   @(<!! (go
           (try
