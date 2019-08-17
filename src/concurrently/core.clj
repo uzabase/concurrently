@@ -57,7 +57,8 @@
 
 (defn- data-end
   [transaction-id]
-  (box/success transaction-id ::data-end))
+  (-> (box/success ::data-end)
+      (assoc :transaction-id transaction-id)))
 
 (defn data-end?
   [boxed]
@@ -159,9 +160,10 @@
                 (recur)
                 (log/debug "input-ch is closed."))))
           (catch Throwable th
-            (>! input-ch (-> (box/failure transaction-id th)
+            (>! input-ch (-> (box/failure th)
                              (assoc :channel next-ch
-                                    :context-name context-name)))
+                                    :context-name context-name
+                                    :transaction-id transaction-id)))
             (>! input-ch data-end-boxed))
           (finally
             (cleanup-in-background requests-ch))))
