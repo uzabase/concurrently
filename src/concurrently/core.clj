@@ -47,9 +47,20 @@
       out-ch)))
 
 (defn chain
-  "Create a channel supplied a transducer."
+  "Create a channel connected to a transducer.
+  Works like `pipe`, but read continuously from input even if an output
+  channel is closed.
+  If an input channel is closed, output will be closed too."
   [source-ch xf & [ex-handler]]
-  (pipe source-ch (chan 1 xf ex-handler)))
+  (let [next-ch (chan 1 xf ex-handler)]
+    (go-loop []
+      (let [item (<! source-ch)]
+        (if (nil? item)
+          (close! next-ch)
+          (do
+            (>! next-ch item)
+            (recur)))))
+    next-ch))
 
 (defn- transaction-id
   []
