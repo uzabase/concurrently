@@ -5,5 +5,5 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/core.async "0.4.500"]
                  [org.clojure/tools.logging "0.5.0"]
-                 [databox "0.1.4"]]
+                 [databox "0.1.7"]]
   :repl-options {:init-ns concurrently.core})
