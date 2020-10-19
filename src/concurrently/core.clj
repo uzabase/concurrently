@@ -195,16 +195,20 @@
                            output-ch
                            (map (fn [{:keys [transaction-id] :as data}]
                                   (log/debug "pipeline")
-                                  (if (data-end? data)
+                                  (cond
+                                    (data-end? data)
                                     data
-                                    (if (job-cancelled? transaction-id)
-                                      (do
-                                        (log/info (str "a job already is cancelled. transaction-id = " transaction-id))
-                                        (box/map data (fn [_] ::skipped)))
-                                      (box/map data
-                                              #(f % (-> data
-                                                        (box/strip-default-keys)
-                                                        (dissoc :channel :transaction-id :context-name))))))))
+                                    
+                                    (job-cancelled? transaction-id)
+                                    (do
+                                      (log/info (str "a job already is cancelled. transaction-id = " transaction-id))
+                                      (box/map data (fn [_] ::skipped)))
+                                    
+                                    :else 
+                                    (let [options (-> data
+                                                      (box/strip-default-keys)
+                                                      (dissoc :channel :transaction-id :context-name))]
+                                      (box/map data #(f % options))))))
                            input-ch)
 
   (let [pipeline-ch (chain output-ch (box/filter #(not= % ::skipped)))]
