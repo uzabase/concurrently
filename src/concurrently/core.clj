@@ -126,7 +126,7 @@
                              (assoc :channel next-ch
                                     :context-name context-name))
           requests-ch    (chain items-ch
-                                (map (fn [item] (-> (box/value item)
+                                (map (fn [item] (-> (box/box item)
                                                     (merge options)
                                                     (assoc :channel next-ch
                                                            :context-name context-name
