@@ -1,6 +1,6 @@
 (ns concurrently.core
   (:require [clojure.core :as core]
-            [clojure.core.async :refer [go go-loop chan to-chan timeout close! alt! >! buffer <! <!! pipe] :as async]
+            [clojure.core.async :refer [go go-loop chan timeout close! alt! >! <! <!!] :as async]
             [clojure.tools.logging :as log]
             [databox.core :as box])
   (:import [java.util UUID]))
@@ -57,11 +57,11 @@
   [boxed]
   (= ::data-end (box/success-value boxed)))
 
-(def current-concurrent-count (atom 0))
+(def current-concurrent-count (ref 0))
 
 (add-watch current-concurrent-count
            ::concurrent-counter
-           (fn [k reference old-value new-value]
+           (fn [_ _ old-value new-value]
              (log/info (format "Concurrent count %d -> %d" old-value new-value))))
 
 (defn cleanup-in-background
@@ -113,6 +113,7 @@
 
     (let [{:keys [ignore-error? timeout-ms next-ch context-name]
            :or   {timeout-ms    120000
+                  ignore-error? false
                   next-ch       (chan 1)
                   context-name  "none"}} options
 
@@ -129,12 +130,17 @@
                                                     (merge options)
                                                     (assoc :channel next-ch
                                                            :context-name context-name
-                                                           :transaction-id transaction-id)))))]
-
-      ;; FOR DEBUG USE
-      ;; A count incremented by each concurrently calls.
-      (swap! current-concurrent-count inc)
-
+                                                           :ignore-error? ignore-error?
+                                                           :transaction-id transaction-id)))))
+          ;; FOR DEBUG USE
+          ;; A count incremented by each concurrently calls.
+          counted        (ref false)
+          count-up-if-first (fn []
+                              (dosync
+                               (when-not (ensure counted)
+                                 (alter current-concurrent-count inc)
+                                 (commute counted true))))]
+      
       ;; Registar a job.
       ;; Jobs can be cancelled by a `cancel` function of ConcurrentJob.
       (registar-job transaction-id)
@@ -149,16 +155,21 @@
           (loop []
             (when-let [data (take-or-throw! requests-ch timeout-ms (str context-name " [writing]"))]
               (if (>! input-ch data)
-                (recur)
+                (do
+                  (count-up-if-first)
+                  (recur))
                 (log/debug "input-ch is closed."))))
           (catch Throwable th
-            (>! input-ch (-> (box/failure th)
-                             (assoc :channel next-ch
-                                    :context-name context-name
-                                    :transaction-id transaction-id))))
+            (when (>! input-ch (-> (box/failure th)
+                                   (assoc :channel next-ch
+                                          :context-name context-name
+                                          :transaction-id transaction-id)))
+              (count-up-if-first)))
           (finally
             (cleanup-in-background requests-ch)
-            (>! input-ch data-end-boxed))))
+            (if (>! input-ch data-end-boxed)
+              (count-up-if-first)
+              (throw (ex-info (str "Couldn't write a data-end. context = " context ", transaction-id = " transaction-id) {:transaction-id transaction-id, :context context}))))))
 
       (->ConcurrentJob next-ch transaction-id))))
 
@@ -212,11 +223,9 @@
             (do
               (log/debug (str "closing channels [" context-name "]"))
               (unregistar-job transaction-id)
-              (swap! current-concurrent-count dec)
+              (dosync (alter current-concurrent-count dec))
               (close! out-ch))
-            (do
-              (>! out-ch item-boxed))))
-
+            (>! out-ch item-boxed)))
         (recur))))
 
   ;; Return a Process Context
