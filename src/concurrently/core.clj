@@ -265,11 +265,24 @@
   (make-concurrent-process :default parallel-count output-ch f input-ch))
 
 (defn get-results
+  "Safely read all data from a channel and return a databox of a vector containing all read data.
+   the items read from a channel must be databoxes. The vector in a returned databox contains 
+   unboxed data of the read items. If an exception occurred while resolving read items, returns 
+   a failure databox containing an exception.
+   
+   This function will throw an exception if :timeout-ms option value isn't :no-timeout and no data available
+   from the 'ch' channel after the :timeout-ms.
+   The :catch function will be called if a databox contains an exception, then returns a failure databox.
+   The :finally function will be called always.
+   
+   'ch' will be read fully even if this function returns early before reading all data from 'ch',  
+   because a go-block is launched automatically for reading 'ch' fully.
+   So a pipeline backing the 'ch' never be stacked by never-read-data remained in a pipeline."
   [ch & [{catch-fn :catch finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
   @(<!! (go
           (try
             (loop [results []]
-              (log/debug "handle-results loop")
+              (log/debug "get-results loop")
               (if-let [item (take-or-throw! ch timeout-ms context-name)]
                 (recur (conj results @item))
                 (box/success results)))
