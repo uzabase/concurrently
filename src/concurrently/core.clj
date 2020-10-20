@@ -187,7 +187,7 @@
 
     (job-cancelled? transaction-id)
     (do
-      (log/info (str "a job already is cancelled. transaction-id = " transaction-id))
+      (log/debug (str "a job already is cancelled. transaction-id = " transaction-id))
       (box/map data (fn [_] ::skipped)))
 
     :else
