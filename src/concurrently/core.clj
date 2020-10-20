@@ -139,7 +139,7 @@
                               (dosync
                                (when-not (ensure counted)
                                  (alter current-concurrent-count inc)
-                                 (commute counted true))))]
+                                 (commute counted (fn [_] true)))))]
       
       ;; Registar a job.
       ;; Jobs can be cancelled by a `cancel` function of ConcurrentJob.
@@ -265,10 +265,10 @@
   (make-concurrent-process :default parallel-count output-ch f input-ch))
 
 (defn get-results
-  "Safely read all data from a channel and return a databox of a vector containing all read data.
-   the items read from a channel must be databoxes. The vector in a returned databox contains 
-   unboxed data of the read items. If an exception occurred while resolving read items, returns 
-   a failure databox containing an exception.
+  "Safely read all data from a channel and return a vector containing all read data.
+   the items read from a channel must be databoxes. The result vector contains 
+   unboxed data of the read items. If an exception occurred while resolving read items, 
+   an exception will be thrown.
    
    This function will throw an exception if :timeout-ms option value isn't :no-timeout and no data available
    from the 'ch' channel after the :timeout-ms.
