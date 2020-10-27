@@ -125,8 +125,9 @@
             (recur)))
         (finally
           (cleanup-in-background channel)
-          (is (= 4 @counter))))))
-  
+          (is (= 4 @counter)))))))
+
+(deftest test-for-get-results
   (testing "catch block must be called if a first failure box is found"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
@@ -150,7 +151,7 @@
           (swap! test-refs update :exception-thrown? (fn [_] true))))
       (is (true? (:catch-called? @test-refs)))
       (is (true? (:exception-thrown? @test-refs)))))
-  
+
   (testing "finally fn must be called if it is supplied as a part of options for get-results"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
@@ -165,7 +166,7 @@
       (get-results channel
                    {:finally #(reset! finally-block-called? true)})
       (is (true? @finally-block-called?))))
-  
+
   (testing "timeout exception must be thrown if the :timeout-ms option for get-results is not :no-timeout and a specified timeout-ms passed before getting an item from channel"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)

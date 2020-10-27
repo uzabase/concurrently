@@ -6,6 +6,6 @@
                  [org.clojure/core.async "0.4.500"]
                  [org.clojure/tools.logging "0.5.0"]
                  [databox "0.1.7"]]
-  :profiles {:repl {:dependencies [[eftest "0.5.9"]]
-                    :plugins [[lein-eftest "0.5.9"]]}}
+  :profiles {:dev {:dependencies [[eftest "0.5.9"]]
+                   :plugins [[lein-eftest "0.5.9"]]}}
   :repl-options {:init-ns concurrently.core})
