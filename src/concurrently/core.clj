@@ -179,7 +179,7 @@
 
 
 (defn- handle-pipeline-data
-  [{:keys [transaction-id] :as data} f]
+  [{:keys [transaction-id] :as data} xf]
   (log/debug "pipeline")
   (cond
     (data-end? data)
@@ -194,14 +194,15 @@
     (let [options (-> data
                       (box/strip-default-keys)
                       (dissoc :channel :transaction-id :context-name))]
-      (box/map data #(f % options)))))
+      (box/map data #(->> (sequence xf [{:data %, :options options}])
+                          (first))))))
 
 
 (def ^:private pipeline-fn {:blocking async/pipeline-blocking
                             :default  async/pipeline})
 
 (defn- make-concurrent-process
-  [pipeline-type parallel-count output-ch f input-ch]
+  [pipeline-type parallel-count output-ch xf input-ch]
   (let [pipeline (or (pipeline-fn pipeline-type) 
                      (throw (ex-info (str "no such pipeline-type: " pipeline-type) 
                                      {:pipeline-type pipeline-type})))]
@@ -218,7 +219,7 @@
     ;; and spits the databoxes onto the :channel.
     (pipeline parallel-count
               output-ch
-              (map (fn [data] (handle-pipeline-data data f)))
+              (map (fn [data] (handle-pipeline-data data xf)))
               input-ch))
 
   (let [pipeline-ch (chain output-ch (box/filter #(not= % ::skipped)))]

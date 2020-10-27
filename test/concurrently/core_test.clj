@@ -19,7 +19,7 @@
           context (concurrent-process-blocking
                    3
                    pipeline-output-ch
-                   (fn [data _] (upper-case data))
+                   (map (fn [{:keys [data]}] (upper-case data)))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan data-coll) {})]
@@ -36,11 +36,11 @@
           context (concurrent-process-blocking
                    1
                    pipeline-output-ch
-                   (fn [data _]
-                     (let [c (swap! counter inc)]
-                       (if (= c 1)
-                         (throw (ex-info "test error" {}))
-                         data)))
+                   (map (fn [{:keys [data]}]
+                          (let [c (swap! counter inc)]
+                            (if (= c 1)
+                              (throw (ex-info "test error" {}))
+                              data))))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan data-coll) {})]
@@ -58,7 +58,7 @@
           context (concurrent-process
                    3
                    pipeline-output-ch
-                   (fn [_ options] options)
+                   (map (fn [{:keys [options]}] options))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan data-coll) test-options)]
