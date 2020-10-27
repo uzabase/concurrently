@@ -194,7 +194,7 @@
     (let [options (-> data
                       (box/strip-default-keys)
                       (dissoc :channel :transaction-id :context-name))]
-      (box/map data #(->> (sequence xf [{:data %, :options options}])
+      (box/map data #(->> (sequence xf [{:data % :options options}])
                           (first))))))
 
 
