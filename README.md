@@ -42,12 +42,21 @@ You should not use an input channel of pipeline directly.
 Instead of that, you should use `concurrently` function with the returned process-context, 
 a channel which all input data can be read from, and an option map.
 
+`concurrently` wraps all input data by `databox` and concurrent-process handles
+the databoxes so that if some exceptions occurred in a supplied transducer, the exception safely
+converted to a failure-box and passed-through into pipeline.
+
 ### getting calculated results from Job
 
 `concurrently` returns a `Job`. You can cancel the job by calling `(cancel job)` function.
 `Job` contains a field `:channel`. You can read all calculated results for all input data supplied to
 `concurrently` function from the channel, but should not read it directly. 
 Use `(get-results (:channel job))` function for safe-reading from channels.
+
+`get-results` handles all databoxes from a channel and create a result vector. 
+If a failure databox is found while handling databoxes, `get-results` will throw the exception and 
+handle all remaining data in a channel in background for protecting the channel from stacking caused by 
+never-read data in a channel.
 
 
 ### Connecting channels
