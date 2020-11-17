@@ -38,8 +38,8 @@ Transducer must accept a map with :data and :options keys.
 ### Supply data to the created engine 
 
 `concurrent-process` and `concurrent-process-blocking` return a process-context. 
-You should not use an input channel of pipeline directly, but should use `concurrently` function.
-Instead of that, you can use the `concurrently` function with the returned process-context, 
+You should not use an input channel of pipeline directly.
+Instead of that, you should use `concurrently` function with the returned process-context, 
 a channel which all input data can be read from, and an option map.
 
 ### getting calculated results from Job
