@@ -111,7 +111,8 @@
   (if-not items-ch
     (async/to-chan [])
 
-    (let [{:keys [ignore-error? timeout-ms next-ch context-name]
+    (let [{:keys [ignore-error? timeout-ms context-name]
+           next-ch :channel
            :or   {timeout-ms    120000
                   ignore-error? false
                   next-ch       (chan 1)
