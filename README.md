@@ -82,6 +82,7 @@ Functions of databox safely handle exceptions occurred in databox-processing and
 
 ### WORK THROUGH
 
+```clojure
 (defn my-great-function
   [data options]
   ;; do something....
@@ -103,8 +104,7 @@ Functions of databox safely handle exceptions occurred in databox-processing and
                             :timeout-ms 5000})]
   ;; you can handle results here
   )
-
-
+```
 
 ## License
 
