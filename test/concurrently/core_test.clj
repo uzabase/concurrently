@@ -29,7 +29,7 @@
           (is (= ["A" "B" "C"] results)))
         (finally
           (cancel job)))))
-  
+
   (testing "channel will be closed if an exception occurred at first item"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
@@ -51,11 +51,11 @@
         (is (nil? (<!! channel)))
         (finally
           (cancel job)))))
-  
+
   (testing "all options passed to 'concurrently' must be merged into a 'options' parameter of pipeline function."
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
-          test-options {:test "option"}
+          test-options {:test "option", :test2 "option2", :test3 "option3"}
           context (concurrent-process
                    3
                    pipeline-output-ch
@@ -70,7 +70,7 @@
           (is (has-same-key-values? (nth results 2) test-options)))
         (finally
           (cancel job)))))
-  
+
   (testing "Concurrent job is cancellable"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
@@ -91,7 +91,7 @@
             (reset! last-item boxed)
             (recur)))
         (is (not= "e" (success-value @last-item))))))
-  
+
   (testing "If supplied transducer caused exceptions, the result boxed data become failure box"
     (let [pipeline-input-ch (chan)
           pipeline-output-ch (chan)
@@ -125,7 +125,26 @@
             (recur)))
         (finally
           (cleanup-in-background channel)
-          (is (= 4 @counter)))))))
+          (is (= 4 @counter))))))
+
+  (testing "all failure boxes must be ignored if a ':ignore-error?' option is true"
+    (let [pipeline-input-ch (chan)
+          pipeline-output-ch (chan)
+          context (concurrent-process
+                   1
+                   pipeline-output-ch
+                   (map (fn [{:keys [data]}] 
+                          (case data
+                            ("b" "c") (do
+                                        (println (str "ignored: " data)) 
+                                        (throw (ex-info "test-error" {:data data})))
+                            data)))
+                   pipeline-input-ch)
+          data-coll ["a" "b" "c" "d" "e"]
+          {:keys [channel]} (concurrently context 
+                                          (to-chan data-coll) 
+                                          {:ignore-error? true})]
+      (is (= ["a" "d" "e"] (get-results channel))))))
 
 (deftest test-for-get-results
   (testing "catch block must be called if a first failure box is found"
