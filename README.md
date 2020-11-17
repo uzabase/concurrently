@@ -5,58 +5,79 @@ Application can share the engine and put process-requests onto the engine.
 Engine will return a channel containing all processed results for the requests.
 
 This library safely handle pipeline backed by core.async so that pipeline never
-stack by abuse of channels like stopping data from channels or never closing channels.
+stack by abuse of channels like stopping data-retrieving from channels before 
+fully retrieving all data or forgetting to close channels.
 
 This library backed by databox (https://github.com/tyano/databox) that wrap data in
-boxes and make exception-safe handling data in channel-pipeline. All exceptions 
-occured in databoxes safely are wrapped and be pass-through channels until the end
-of channel-pipeline.
+box and make handling data in channel-pipeline exception-safe. All exceptions 
+occured in databox safely are wrapped and be passed-through channels until the end
+of channel-pipeline, so that users can handle exceptions at the end of pipeline.
 
-`get-results` function will handle all actions needed for protecting pipeline from
+`get-results` function handle all actions needed for protecting pipeline from
 accidental stacking. `get-results` try to retrieve all data from an output channel 
-and unwrap databoxes. If an exception were occurred in pipeline, databoxes will throw
-the exception, but `get-results` will handle all data remaining in channel-pipeline for
+and unwrap databoxes. If an exception were occurred in a pipeline, unwrapping the failure-databox will 
+throw the exception, but `get-results` handle all data remaining in channel-pipeline for
 protecting the pipeline from accidental stacking.
 
 ## Usage
 
-### Create an process-engine by concurrent-process-blocking
+### Create an process-engine by `concurrent-process` function
 
-You can make an engine from a function with input and output channels and parallel count by
-calling the `concurrent-process-blocking` function.
-All data supplied into input-channel will be handled by a supplied function in parallel by threads
-same number of parallel count. But you should not put data into the input-channel directly.
+You can make an engine with a transducer, input and output channels and max parallel count by
+calling `concurrent-process` or `concurrent-process-blocking` functions.
+All data supplied into input-channel will be handled by a supplied transducer in parallel by 
+go-blocks or threads of same number with parallel count. 
+But you should not put data into the input-channel directly. 
 You can supply data into an engine by another function.
 
-`concurrent-process-blocking` will return a process-context. 
-You can use the context for supplying data for the engine by passing it to `concurrently` function.
+Transducer must accept a map with :data and :options keys.
+:data is a value from input channel.
+:options is a option-map supplied to `concurrently` function.
 
 
-### Supply data for the created engine 
+### Supply data to the created engine 
 
-You can pass a channel containing input-data for the engine to `concurrently` function. The function
-will return a `concurrent-job`. You can get the handled results by calling `(get-results (:channel job))` function.
-Or cancel the job by calling `(cancel job)` function.
+`concurrent-process` and `concurrent-process-blocking` return a process-context. 
+You should not use an input channel of pipeline directly, but should use `concurrently` function.
+Instead of that, you can use the `concurrently` function with the returned process-context, 
+a channel which all input data can be read from, and an option map.
+
+### getting calculated results from Job
+
+`concurrently` returns a `Job`. You can cancel the job by calling `(cancel job)` function.
+`Job` contains a field `:channel`. You can read all calculated results for all input data supplied to
+`concurrently` function from the channel, but should not read it directly. 
+Use `(get-results (:channel job))` function for safe-reading from channels.
+
 
 ### Connecting channels
 
 You should call `get-results` at last for safe processing of channels, but before calling it, you can connect
-the channel containing by a job to another channels. You can do it with `pipe` of core.async, but there is a utility
-function for doing it. 
+the channel contained by a job to another channels. Although you can do it with `pipe` of core.async, 
+but there is a safe utility function for doing it.
 
 (chain channel transducer exception-handler)
 
-You can connect a channel to a transducer by this function (with an exception handler if you want) and can get a next channel.
+You can connect a channel to a transducer by this `chain` function (with an exception handler if you want) and can get a next channel.
 This connection can be chained like:
 
 ```clojure
-(-> channel
+(-> (:channel job)
     (chain xf1)
     (chain xf2)
     (chain xf3))
 ```
     
 This will return a last channel and you can get the results by calling `get-results` on the last channel.
+
+Difference of `chain` and `pipe` is that `pipe` stops reading from an input channel if the output channel is closed,
+but `chain` never stop reading input so that data never remain in an input channel.
+Remaining data in a channel might cause accidental channel-stacking. All data should be read fully.
+
+Note that the data from a channel in a job always are databoxes. Transducer supplied to `chain` must handle
+databox and must return databox. Use `databox.core/map`, `databox.core/mapcat` or `databox.core/filter` transducers 
+for handling databoxes for safe. 
+Functions of databox safely handle exceptions occurred in databox-processing and always return a databox.
 
 
 ### WORK THROUGH
@@ -67,11 +88,16 @@ This will return a last channel and you can get the results by calling `get-resu
   )
 
 ;;; create an engine handle data by 8 threads in parallel.
-(def shared-process (concurrent-process-blocking 8 (chan 1) my-great-function (chan 1)))
+(def shared-process (concurrent-process-blocking 8 
+                                                 (chan 1) 
+                                                 ;; transducer must accept a map with :data and :options keys
+                                                 (map #(let [{:keys [data options]}] (my-great-function data options))
+                                                 (chan 1)))
   
 ;;; pass data
-(let [{:keys [channel] :as job} (concurrenty shared-process (to-chan [:a :b :c]) {})
-      results (get-results channel 
+(let [{:keys [channel] :as job} (concurrenty shared-process (to-chan [:a :b :c]) {:option-to-function true})
+      next-ch (chain channel (databox.core/map #(upper-case %)))
+      results (get-results next-ch 
                            {:catch (fn [ex] ...)
                             :finally (fn [] ...)
                             :timeout-ms 5000})]
