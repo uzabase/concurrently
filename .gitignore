@@ -12,3 +12,8 @@ pom.xml.asc
 .hg/
 .calva/
 *.code-workspace
+.classpath
+.lsp/
+.project
+.settings/
+
