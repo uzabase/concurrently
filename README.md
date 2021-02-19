@@ -21,6 +21,18 @@ protecting the pipeline from accidental stacking.
 
 ## Usage
 
+### Install
+
+Leiningen:
+```
+[concurrently "0.2.0"]
+```
+
+Clojure CLI:
+```
+concurrently/concurrently {:mvn/version "0.2.0"}
+```
+
 ### Create an process-engine by `concurrent-process` function
 
 You can make an engine with a transducer, input and output channels and max parallel count by
