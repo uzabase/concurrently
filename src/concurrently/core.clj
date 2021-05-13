@@ -3,7 +3,8 @@
             [clojure.core.async :refer [go go-loop chan timeout close! alt! >! <! <!!] :as async]
             [clojure.tools.logging :as log]
             [databox.core :as box])
-  (:import [java.util UUID]))
+  (:import [java.util UUID]
+           [clojure.core.async.impl.channels ManyToManyChannel]))
 
 
 (defmacro take-or-throw!
@@ -28,21 +29,25 @@
                        "channel read timeout!")]
             (throw (ex-info msg# {:reason ::channel-timeout}))))))))
 
-(defn chain
-  "Create a channel connected to a transducer.
-  Works like `pipe`, but read continuously from input even if an output
-  channel is closed.
-  If an input channel is closed, output will be closed too."
-  [source-ch xf & [ex-handler]]
-  (let [next-ch (chan 1 xf ex-handler)]
-    (go-loop []
-      (let [item (<! source-ch)]
-        (if (nil? item)
-          (close! next-ch)
-          (do
-            (>! next-ch item)
-            (recur)))))
-    next-ch))
+(defprotocol Chainable
+  (chain [source xf] [source xf ex-handler] "Create a new Chainable which have same type with 'source' and supplies all items from source applying xf on them."))
+
+(extend-type ManyToManyChannel 
+  Chainable
+  (chain 
+    ([source xf]
+     (chain source xf nil))
+    
+    ([source xf ex-handler]
+     (let [next-ch (chan 1 xf ex-handler)]
+       (go-loop []
+         (let [item (<! source)]
+           (if (nil? item)
+             (close! next-ch)
+             (do
+               (>! next-ch item)
+               (recur)))))
+       next-ch))))
 
 (defn- transaction-id
   []
@@ -92,11 +97,22 @@
   nil
   (cancel [job] nil))
 
+
 (defrecord ConcurrentJob [channel transaction-id]
   Cancellable
   (cancel [self]
     (when transaction-id
-      (swap! jobs disj transaction-id))))
+      (swap! jobs disj transaction-id)))
+  
+  Chainable
+  (chain [source xf]
+    (chain source xf nil))
+  
+  (chain [source xf ex-handler]
+    (update source
+            :channel
+            (fn [ch]
+              (chain ch xf ex-handler)))))
 
 (defn concurrent-job
   ([channel id]
