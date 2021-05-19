@@ -25,12 +25,12 @@ protecting the pipeline from accidental stacking.
 
 Leiningen:
 ```
-[concurrently "0.2.0"]
+[concurrently "0.2.1"]
 ```
 
 Clojure CLI:
 ```
-concurrently/concurrently {:mvn/version "0.2.0"}
+concurrently/concurrently {:mvn/version "0.2.1"}
 ```
 
 ### Create an process-engine by `concurrent-process` function
@@ -97,7 +97,7 @@ Remaining data in a channel might cause accidental channel-stacking. All data sh
 
 And `chain` is callable on all instances that satisfies the `Chainable` protocol. Currently channels of core.async and ConcurrentJob made by the `concurrently` function satisfy the protocol. So you can:
 
-```
+```clojure
 ;; You can apply a transducer to a ConcurrentJob.
 ;; The transducer will be applied to the :channel of the ConcurrentJob.
 (let [job (-> (concurrently ...)
