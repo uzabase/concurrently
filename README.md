@@ -58,17 +58,42 @@ a channel which all input data can be read from, and an option map.
 the databoxes so that if some exceptions occurred in a supplied transducer, the exception safely
 converted to a failure-box and passed-through into pipeline.
 
-### getting calculated results from Job
+### getting calculated results from a Job
 
 `concurrently` returns a `Job`. You can cancel the job by calling `(cancel job)` function.
 `Job` contains a field `:channel`. You can read all calculated results for all input data supplied to
 `concurrently` function from the channel, but should not read it directly.
 Use `(get-results (:channel job))` function for safe-reading from channels.
 
-`get-results` handles all databoxes from a channel and create a result vector.
+`get-results` handles all databoxes from a channel and create a vector which contains all values of databoxes.
 If a failure databox is found while handling databoxes, `get-results` will throw the exception and
 handle all remaining data in a channel in background for protecting the channel from stacking caused by
 never-read data in a channel.
+
+`get-results` accepts arguments:
+
+ch - a channel for reading.
+option-map - optional. a map containing the following keys.
+
+keys:
+:catch - is a funciton called when an exception occurs. This fn is for closing related channels certainly.
+   In many cases, if an exception occurred, no following channel-processsings are not acceptable,
+   So all read channel must be closed at this time. It is recommended to supply this function always,
+   but should not be used for handling application exceptions. Only for channel handling.
+   Application exceptions should be handled by try-catch in application code which wraps this 'get-result' call.
+
+:finally - is a function that will be called always, but be called after the ch is CLOSED.
+   If the ch is not read fully, it will be read fully automatically.
+   When the ch is read fully or be closed manually, this :finally fn will be called.
+   So SHOULD NOT DO APPLICATION's FINALLY-PROCESS here. This function is for actions which must be occurred after
+   the ch is closed. Application's finally-process must be handled by try-catch in application code which
+   wraps this 'get-result' call.
+
+:context-name - optional. a information which is used at logging for distincting processes.
+
+:timeout-ms - optional. default is 120000 (ms). The time to give up reading the ch. An exception will be thrown after
+   this timeout and the exception will be wrapped by a failure box and be returned.
+
 
 
 ### Connecting channels

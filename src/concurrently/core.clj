@@ -303,8 +303,8 @@
    The :finally function will be called always, but called after the ch is CLOSED. 
    If the ch is not read fully, it will be read fully by 'cleanup-in-background' fn automatically,
    When the ch is read fully or be closed manually, this :finally fn will be called. 
-   So SHOULD NOT DO APPLICATION FINALLY PROCESS here. This function is for actions which must be occurred after
-   all channels are closed. Application's finally-process must be handled by try-catch in application code which
+   So SHOULD NOT DO APPLICATION's FINALLY-PROCESS here. This function is for actions which must be occurred after
+   the ch is closed. Application's finally-process must be handled by try-catch in application code which
    wraps this 'get-result' call.
 
    'ch' will be read fully even if this function returns early before reading all data from 'ch',  
