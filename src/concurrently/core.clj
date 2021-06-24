@@ -71,10 +71,12 @@
 
 (defn cleanup-in-background
   "Slurp all data in a channel and abandon them silently."
-  [ch]
+  [ch & [finally-fn]]
   (go-loop []
-    (when (<! ch)
-      (recur))))
+    (if (<! ch)
+      (recur)
+      (when finally-fn
+        (finally-fn)))))
 
 (def jobs (atom #{}))
 
@@ -290,9 +292,20 @@
    
    This function will throw an exception if :timeout-ms option value isn't :no-timeout and no data available
    from the 'ch' channel after the :timeout-ms.
-   The :catch function will be called if a databox contains an exception, then returns a failure databox.
-   The :finally function will be called always.
+
+   The :catch is a funciton called when an exception occurs. This fn is for closing related channels certainly. 
+   In many cases, if an exception occurred, no following channel-processsings are not acceptable,
+   So all read channel must be closed at this time. It is recommended to supply this function always, 
+   but should not be used for handling application exceptions. Only for channel handling.
+   Application exceptions should be handled by try-catch in application code which wraps this 'get-result' call.
    
+   The :finally function will be called always, but called after the ch is CLOSED. 
+   If the ch is not read fully, it will be read fully by 'cleanup-in-background' fn automatically,
+   When the ch is read fully or be closed manually, this :finally fn will be called. 
+   So SHOULD NOT DO APPLICATION FINALLY PROCESS here. This function is for actions which must be occurred after
+   all channels are closed. Application's finally-process must be handled by try-catch in application code which
+   wraps this 'get-result' call.
+
    'ch' will be read fully even if this function returns early before reading all data from 'ch',  
    because a go-block is launched automatically for reading 'ch' fully.
    So a pipeline backing the 'ch' never be stacked by never-read-data remained in a pipeline."
@@ -311,6 +324,4 @@
               (box/failure ex))
             (finally
               (log/debug "finally")
-              (cleanup-in-background ch)
-              (when finally-fn
-                (finally-fn)))))))
+              (cleanup-in-background ch finally-fn))))))
