@@ -76,6 +76,7 @@
     (if (<! ch)
       (recur)
       (when finally-fn
+        (log/debug "finally")
         (finally-fn)))))
 
 (def jobs (atom #{}))
@@ -323,5 +324,4 @@
                 (catch-fn ex))
               (box/failure ex))
             (finally
-              (log/debug "finally")
               (cleanup-in-background ch finally-fn))))))
