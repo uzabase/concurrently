@@ -33,12 +33,12 @@ from accidental stacking.
 
 Leiningen:
 ```
-[concurrently "0.2.1"]
+[concurrently "0.2.2"]
 ```
 
 Clojure CLI:
 ```
-concurrently/concurrently {:mvn/version "0.2.1"}
+concurrently/concurrently {:mvn/version "0.2.2"}
 ```
 
 ### Create an process-engine by `concurrent-process` function
