@@ -16,4 +16,5 @@ pom.xml.asc
 .lsp/
 .project
 .settings/
+.DS_Store
 
