@@ -16,9 +16,11 @@
                  pipeline-output-ch
                  (map (fn [{:keys [data]}]
                         (log/debug "begin:" data)
-                        (let [result (if (zero? data)
-                                       (do
-                                         (Thread/sleep 5000)
+                        (let [result (if (odd? data)
+                                       (let [wait-time (-> (rand-int 6)
+                                                            (inc)
+                                                            (+ 1000))]
+                                         (Thread/sleep wait-time)
                                          data)
                                        data)]
                           (log/debug "end:" data)
