@@ -68,7 +68,7 @@
 (add-watch current-concurrent-count
            ::concurrent-counter
            (fn [_ _ old-value new-value]
-             (log/info (format "Concurrent count %d -> %d" old-value new-value))))
+             (log/debug (format "concurrently fn parallel call count %d -> %d" old-value new-value))))
 
 (defn cleanup-in-background
   "Slurp all data in a channel and abandon them silently."
