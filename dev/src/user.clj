@@ -4,7 +4,7 @@
             [clojure.tools.logging :as log]
             [taoensso.timbre :as timbre]))
 
-(timbre/merge-config! {:min-level :debug})
+;; (timbre/merge-config! {:min-level :debug})
 
 
 (defn run-unordered-test-pipeline
