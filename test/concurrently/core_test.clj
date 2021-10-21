@@ -3,7 +3,8 @@
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :refer [chan to-chan <!! timeout ]]
             [clojure.string :refer [upper-case]]
-            [databox.core :refer [failure? success? success-value]])
+            [databox.core :refer [failure? success? success-value]]
+            [clojure.tools.logging :as log])
   (:import [clojure.lang ExceptionInfo]))
 
 
@@ -201,3 +202,49 @@
         (get-results channel {:timeout-ms 500})
         (catch ExceptionInfo ex
           (is (= :concurrently.core/channel-timeout (:reason (ex-data ex)))))))))
+
+(deftest test-for-unordered-pipeline
+  (testing "Can get all results"
+    (let [pipeline-input-ch (chan 1)
+          pipeline-output-ch (chan 1)
+          context (concurrent-process-blocking
+                   3
+                   pipeline-output-ch
+                   (map (fn [{:keys [data]}]
+                          (let [result (if (odd? data)
+                                         (let [wait-time (-> (rand-int 6)
+                                                             (inc)
+                                                             (+ 1000))]
+                                           (Thread/sleep wait-time)
+                                           data)
+                                         data)]
+                            result)))
+                   pipeline-input-ch
+                   {:ordered? false})
+          {:keys [channel]} (concurrently context (to-chan (range 0 10)) {})
+          results (get-results channel)]
+      
+      (log/info "results =" results)
+      (is (= 10 (count results)))))
+      
+  (testing "The result of a slow task go to the tail of results"
+    (let [pipeline-input-ch (chan 1)
+          pipeline-output-ch (chan 1)
+          context (concurrent-process-blocking
+                   3
+                   pipeline-output-ch
+                   (map (fn [{:keys [data]}]
+                          (let [result (if (zero? data)
+                                         (do
+                                           (Thread/sleep 3000)
+                                           data)
+                                         data)]
+                            result)))
+                   pipeline-input-ch
+                   {:ordered? false})
+          {:keys [channel]} (concurrently context (to-chan (range 0 10)) {})
+          results (get-results channel)]
+
+      (log/info "results =" results)
+      (is (= 10 (count results)))
+      (is (= 0 (last results))))))
