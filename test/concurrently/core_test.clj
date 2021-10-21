@@ -184,6 +184,7 @@
           {:keys [channel]} (concurrently context (to-chan data-coll) {})]
       (get-results channel
                    {:finally #(reset! finally-block-called? true)})
+      (<!! (timeout 2000)) ;; wait for cleanup
       (is (true? @finally-block-called?))))
 
   (testing "timeout exception must be thrown if the :timeout-ms option for get-results is not :no-timeout and a specified timeout-ms passed before getting an item from channel"
