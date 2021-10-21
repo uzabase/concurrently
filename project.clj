@@ -6,6 +6,10 @@
                  [org.clojure/core.async "1.3.618"]
                  [org.clojure/tools.logging "1.1.0"]
                  [databox "0.1.7"]]
-  :profiles {:dev {:dependencies [[eftest "0.5.9"]]
-                   :plugins [[lein-eftest "0.5.9"]]}}
+  :profiles {:dev {:dependencies [[eftest "0.5.9"]
+                                  [com.taoensso/timbre "5.1.2"]
+                                  [com.fzakaria/slf4j-timbre "0.3.21"]]
+                   :plugins [[lein-eftest "0.5.9"]]
+                   :source-paths ["dev/src"]
+                   :resource-paths ["dev/resources"]}}
   :repl-options {:init-ns concurrently.core})
