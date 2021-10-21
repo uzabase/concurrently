@@ -17,4 +17,5 @@ pom.xml.asc
 .project
 .settings/
 .DS_Store
+.clj-kondo/
 
