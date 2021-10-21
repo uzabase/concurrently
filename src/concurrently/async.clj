@@ -1,7 +1,8 @@
 (ns concurrently.async
   (:require [clojure.spec.alpha :as s]
             [clojure.core.async :refer [go-loop close! >! <! chan mix
-                                        mix Mux muxch* Mix admix* unmix* unmix-all* toggle* solo-mode* chan]]
+                                        mix Mux muxch* Mix admix* unmix* unmix-all* toggle* solo-mode* chan
+                                        >!! <!! thread put! take! go]]
             [clojure.tools.logging :as log])
   (:import [clojure.core.async.impl.channels ManyToManyChannel]))
 
@@ -107,3 +108,59 @@
            ;; close the downstream channel which this mix hold. 
             (when-not (seq channels)
               (close! out))))))))
+
+
+(defn pipeline-unorderd
+  [n to xf from close? ex-handler type]
+  (assert (pos? n))
+  (let [ex-handler (or ex-handler (fn [ex]
+                                    (-> (Thread/currentThread)
+                                        .getUncaughtExceptionHandler
+                                        (.uncaughtException (Thread/currentThread) ex))
+                                    nil))
+        jobs       (chan n)
+        results    (chan n)
+        process    (fn [v]
+                     (when-not (nil? v)
+                       (let [res (chan 1 xf ex-handler)]
+                         (>!! res v)
+                         (close! res)
+                         res)))
+        async      (fn [v]
+                     (when-not (nil? v)
+                       (let [res (chan 1)]
+                         (xf v res)
+                         res)))]
+    (dotimes [_ n]
+      (case type
+        (:blocking :compute) (thread
+                               (let [v (<!! jobs)]
+                                 (if-let [r (process v)]
+                                   (do
+                                     (>!! results r)
+                                     (recur))
+                                   (close! results))))
+        :async (go-loop []
+                 (let [v (<! jobs)]
+                   (if-let [r (async v)]
+                     (do
+                       (>!! results r)
+                       (recur))
+                     (close! results))))))
+    (go-loop []
+      (let [v (<! from)]
+        (if (nil? v)
+          (close! jobs)
+          (do
+            (>! jobs v)
+            (recur)))))
+    (go-loop []
+      (let [res (<! results)]
+        (if (nil? res)
+          (when close? (close! to))
+          (do
+            (loop []
+              (let [v (<! res)]
+                (when (and (not (nil? v)) (>! to v))
+                  (recur))))
+            (recur)))))))
