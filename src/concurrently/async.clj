@@ -67,7 +67,7 @@
         (admix*
           [_ ch]
           (if (true? (:freezed @state))
-            (throw (ex-info "This mix already is freezed. You can not admix more."))
+            (throw (ex-info "This mix already is freezed. You can not admix more." {}))
             (letfn [(complete
                       [ch]
                       (let [{:keys [freezed channels]} (swap! state update :channels disj ch)]
