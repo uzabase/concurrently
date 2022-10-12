@@ -33,12 +33,12 @@ from accidental stacking.
 
 Leiningen:
 ```
-[concurrently "0.2.2"]
+[concurrently "0.2.3"]
 ```
 
 Clojure CLI:
 ```
-concurrently/concurrently {:mvn/version "0.2.2"}
+concurrently/concurrently {:mvn/version "0.2.3"}
 ```
 
 ### Create an process-engine by `concurrent-process` function
@@ -49,12 +49,47 @@ All data supplied into then input-channel will be handled by a supplied transduc
 go-blocks or threads of same number with the parallel count.
 
 But you should not put data into the input-channel directly. You must use the `concurrently` function
-(Explanation of the `concurrently` fn is below).
+(Explanation of the `concurrently` fn is following).
 
 Transducer must accept a map with :data and :options keys.
 :data is a value from input channel.
 :options is a option-map supplied to `concurrently` function.
 
+example:
+```clojure
+(def shared-process (concurrent-process
+                        8
+                        (chan 1)
+                        ;; transducer must accept a map with :data and :options keys
+                        (map #(fn [{:keys [data options]}] (my-great-function data options))
+                        (chan 1)))
+```
+
+### unordered pipeline
+
+All of pipeline functions of core.async only support ordered pipeline, on which
+all output data are produced in same order of input. But in real usecase you would
+want to get results as soon as possible just after the input data is processed.
+
+This library supports 'unordered-pipeline'.
+
+With onordered pipeline, output data are not in same order with input values.
+all results will be pushed to output channel as soon as possible after a parallel
+task finished.
+
+For making unordered pipeline, just supply {:ordered false} as option map to
+`make-concurrent-process` function.
+
+example:
+```clojure
+(def shared-process (concurrent-process
+                        8
+                        (chan 1)
+                        ;; transducer must accept a map with :data and :options keys
+                        (map #(fn [{:keys [data options]}] (my-great-function data options))
+                        (chan 1)
+                        {:ordered? false})) ;; <<- This line
+```
 
 ### Supply data to the created engine
 
@@ -171,11 +206,11 @@ For example:
 (def shared-process (concurrent-process-blocking 8
                                                  (chan 1)
                                                  ;; transducer must accept a map with :data and :options keys
-                                                 (map #(let [{:keys [data options]}] (my-great-function data options))
+                                                 (map #(fn [{:keys [data options]}] (my-great-function data options))
                                                  (chan 1)))
 
 ;;; pass data
-(let [{:keys [channel] :as job} (-> (concurrenty shared-process (to-chan [:a :b :c]) {:option-to-function true})
+(let [{:keys [channel] :as job} (-> (concurrenty shared-process (to-chan! [:a :b :c]) {:option-to-function true})
                                     (chain (databox.core/map #(upper-case %))))
       results (get-results channel
                            {:catch (fn [ex] (cancel job))
