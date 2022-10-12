@@ -1,7 +1,7 @@
 (ns concurrently.core_test
   (:require [concurrently.core :refer [concurrent-process concurrent-process-blocking concurrently get-results cancel cleanup-in-background]]
             [clojure.test :refer [deftest testing is]]
-            [clojure.core.async :refer [chan to-chan <!! timeout ]]
+            [clojure.core.async :refer [chan to-chan! <!! timeout ]]
             [clojure.string :refer [upper-case]]
             [databox.core :refer [failure? success? success-value]]
             [clojure.tools.logging :as log])
@@ -24,7 +24,7 @@
                    (map (fn [{:keys [data]}] (upper-case data)))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
-          {:keys [channel] :as job} (concurrently context (to-chan data-coll) {})]
+          {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
       (try
         (let [results (get-results channel)]
           (is (= ["A" "B" "C"] results)))
@@ -45,7 +45,7 @@
                               data))))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
-          {:keys [channel] :as job} (concurrently context (to-chan data-coll) {})]
+          {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
       (try
         (is (thrown? ExceptionInfo (get-results channel)))
         (<!! (timeout 3000))
@@ -63,7 +63,7 @@
                    (map (fn [{:keys [options]}] options))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
-          {:keys [channel] :as job} (concurrently context (to-chan data-coll) test-options)]
+          {:keys [channel] :as job} (concurrently context (to-chan! data-coll) test-options)]
       (try
         (let [results (get-results channel)]
           (is (has-same-key-values? (nth results 0) test-options))
@@ -80,8 +80,8 @@
                    pipeline-output-ch
                    (map (fn [{:keys [data]}] data))
                    pipeline-input-ch)
-          data-coll ["a" "b" "c" "d" "e"]
-          {:keys [channel] :as job} (concurrently context (to-chan data-coll) {})]
+          data-coll ["a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v" "w" "x" "y" "z"]
+          {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
       (let [v (<!! channel)]
         (is (some? v)))
       (cancel job)
@@ -91,7 +91,7 @@
             (prn boxed)
             (reset! last-item boxed)
             (recur)))
-        (is (not= "e" (success-value @last-item))))))
+        (is (not= "z" (success-value @last-item))))))
 
   (testing "If supplied transducer caused exceptions, the result boxed data become failure box"
     (let [pipeline-input-ch (chan)
@@ -108,7 +108,7 @@
                      {:index 2, :data "b"}
                      {:index 3, :data "c"}
                      {:index 4, :data "d"}]
-          {:keys [channel]} (concurrently context (to-chan data-coll) {})
+          {:keys [channel]} (concurrently context (to-chan! data-coll) {})
           counter (atom 0)]
       (try
         (loop []
@@ -143,7 +143,7 @@
                    pipeline-input-ch)
           data-coll ["a" "b" "c" "d" "e"]
           {:keys [channel]} (concurrently context 
-                                          (to-chan data-coll) 
+                                          (to-chan! data-coll) 
                                           {:ignore-error? true})]
       (is (= ["a" "d" "e"] (get-results channel))))))
 
@@ -162,7 +162,7 @@
           data-coll ["a" "b" "c"]
           test-refs (atom {:catch-called? false
                            :exception-thrown? false})
-          {:keys [channel]} (concurrently context (to-chan data-coll) {})]
+          {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
       (try
         (get-results channel
                      {:catch (fn [_] (swap! test-refs update :catch-called? (fn [_] true)))})
@@ -182,7 +182,7 @@
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           finally-block-called? (atom false)
-          {:keys [channel]} (concurrently context (to-chan data-coll) {})]
+          {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
       (get-results channel
                    {:finally #(reset! finally-block-called? true)})
       (<!! (timeout 2000)) ;; wait for cleanup
@@ -197,7 +197,7 @@
                    (map (fn [{:keys [data]}] (<!! (timeout 1000)) data))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
-          {:keys [channel]} (concurrently context (to-chan data-coll) {})]
+          {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
       (try
         (get-results channel {:timeout-ms 500})
         (catch ExceptionInfo ex
@@ -221,7 +221,7 @@
                             result)))
                    pipeline-input-ch
                    {:ordered? false})
-          {:keys [channel]} (concurrently context (to-chan (range 0 10)) {})
+          {:keys [channel]} (concurrently context (to-chan! (range 0 10)) {})
           results (get-results channel)]
       
       (log/info "results =" results)
@@ -242,7 +242,7 @@
                             result)))
                    pipeline-input-ch
                    {:ordered? false})
-          {:keys [channel]} (concurrently context (to-chan (range 0 10)) {})
+          {:keys [channel]} (concurrently context (to-chan! (range 0 10)) {})
           results (get-results channel)]
 
       (log/info "results =" results)

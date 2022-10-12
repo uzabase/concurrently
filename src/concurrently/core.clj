@@ -129,7 +129,7 @@
   (assert (some? input-ch))
 
   (if-not items-ch
-    (async/to-chan [])
+    (async/to-chan! [])
 
     (let [{:keys [ignore-error? timeout-ms context-name]
            next-ch :channel
