@@ -3,7 +3,7 @@
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :refer [chan to-chan! <!! timeout ]]
             [clojure.string :refer [upper-case]]
-            [databox.core :refer [failure? success? success-value]]
+            [databox.core :refer [failure? success? success-value] :as box]
             [clojure.tools.logging :as log])
   (:import [clojure.lang ExceptionInfo]))
 
@@ -21,7 +21,7 @@
           context (concurrent-process-blocking
                    3
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}] (upper-case data)))
+                   (box/map (fn [{:keys [data]}] (upper-case data)))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
@@ -38,11 +38,11 @@
           context (concurrent-process-blocking
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}]
-                          (let [c (swap! counter inc)]
-                            (if (= c 1)
-                              (throw (ex-info "test error" {}))
-                              data))))
+                   (box/map (fn [{:keys [data]}]
+                              (let [c (swap! counter inc)]
+                                (if (= c 1)
+                                  (throw (ex-info "test error" {}))
+                                  data))))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
@@ -60,7 +60,7 @@
           context (concurrent-process
                    3
                    pipeline-output-ch
-                   (map (fn [{:keys [options]}] options))
+                   (box/map (fn [{:keys [options]}] options))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) test-options)]
@@ -78,7 +78,7 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}] data))
+                   (box/map (fn [{:keys [data]}] data))
                    pipeline-input-ch)
           data-coll ["a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v" "w" "x" "y" "z"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
@@ -99,10 +99,10 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{{:keys [index data]} :data}]
-                          (if (zero? (rem index 2))
-                            (throw (ex-info "test error" {:index index}))
-                            data)))
+                   (box/map (fn [{{:keys [index data]} :data}]
+                              (if (zero? (rem index 2))
+                                (throw (ex-info "test error" {:index index}))
+                                data)))
                    pipeline-input-ch)
           data-coll [{:index 1, :data "a"}
                      {:index 2, :data "b"}
@@ -134,12 +134,12 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}] 
-                          (case data
-                            ("b" "c") (do
-                                        (println (str "ignored: " data)) 
-                                        (throw (ex-info "test-error" {:data data})))
-                            data)))
+                   (box/map (fn [{:keys [data]}]
+                              (case data
+                                ("b" "c") (do
+                                            (println (str "ignored: " data))
+                                            (throw (ex-info "test-error" {:data data})))
+                                data)))
                    pipeline-input-ch)
           data-coll ["a" "b" "c" "d" "e"]
           {:keys [channel]} (concurrently context 
@@ -154,10 +154,10 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}]
-                          (if (= "b" data)
-                            (throw (ex-info "test error" {:value :catch-test}))
-                            data)))
+                   (box/map (fn [{:keys [data]}]
+                              (if (= "b" data)
+                                (throw (ex-info "test error" {:value :catch-test}))
+                                data)))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           test-refs (atom {:catch-called? false
@@ -178,7 +178,7 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}] data))
+                   (box/map (fn [{:keys [data]}] data))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           finally-block-called? (atom false)
@@ -194,7 +194,7 @@
           context (concurrent-process
                    1
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}] (<!! (timeout 1000)) data))
+                   (box/map (fn [{:keys [data]}] (<!! (timeout 1000)) data))
                    pipeline-input-ch)
           data-coll ["a" "b" "c"]
           {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
@@ -210,7 +210,8 @@
           context (concurrent-process-blocking
                    3
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}]
+                   (box/map (fn [{:keys [data] :as boxed}]
+                              (println "must be integer = " data ", boxed =" boxed)
                           (let [result (if (odd? data)
                                          (let [wait-time (-> (rand-int 6)
                                                              (inc)
@@ -233,13 +234,13 @@
           context (concurrent-process-blocking
                    3
                    pipeline-output-ch
-                   (map (fn [{:keys [data]}]
-                          (let [result (if (zero? data)
-                                         (do
-                                           (Thread/sleep 3000)
-                                           data)
-                                         data)]
-                            result)))
+                   (box/map (fn [{:keys [data]}]
+                              (let [result (if (zero? data)
+                                             (do
+                                               (Thread/sleep 3000)
+                                               data)
+                                             data)]
+                                result)))
                    pipeline-input-ch
                    {:ordered? false})
           {:keys [channel]} (concurrently context (to-chan! (range 0 10)) {})

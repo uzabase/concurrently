@@ -56,7 +56,7 @@
 
 (defn- data-end
   [transaction-id]
-  (-> (box/success ::data-end)
+  (-> (box/disable ::data-end)
       (assoc :transaction-id transaction-id)))
 
 (defn data-end?
@@ -224,6 +224,35 @@
       (box/map data #(->> (sequence xf [{:data % :options options}])
                           (first))))))
 
+(def boxify
+  (map (fn [data] (box/box data))))
+
+(def check-cancelled-xf
+  (map (fn [{:keys [transaction-id] :as boxed}]
+         (cond
+           (data-end? boxed)
+           boxed
+
+           (job-cancelled? transaction-id)
+           (do
+             (log/debug (str "a job already is cancelled. transaction-id = " transaction-id))
+             (box/map boxed (fn [_] ::skipped)))
+
+           :else
+           boxed))))
+
+(def normalize-xf
+  (map (fn [boxed]
+         (cond
+           (data-end? boxed)
+           boxed
+
+           :else
+           (let [options (-> boxed
+                             (box/strip-default-keys)
+                             (dissoc :channel :transaction-id :context-name))]
+             (box/map boxed (fn [data] {:data data :options options})))))))
+
 
 (def ^:private pipeline-ordered-fn {:blocking async/pipeline-blocking
                                     :default  async/pipeline})
@@ -253,9 +282,9 @@
 
 (defn- make-concurrent-process
   [pipeline-type parallel-count output-ch xf input-ch {:keys [ordered?] :or {ordered? true}}]
-  (let [pipeline (or (pipeline-fn pipeline-type ordered?) 
-                     (throw (ex-info (str "no such pipeline-type: " pipeline-type) 
-                                     {:pipeline-type pipeline-type})))]
+  (let [pipelinef (or (pipeline-fn pipeline-type ordered?) 
+                      (throw (ex-info (str "no such pipeline-type: " pipeline-type)
+                                      {:pipeline-type pipeline-type})))]
     ;; Start a concurrent pipeline backed by `pipeline-*` fns of core.async and
     ;; return a Process Context.
     ;; This Process Context should be shared in an application.
@@ -267,10 +296,10 @@
     ;;
     ;; A go-loop started in this function slurps all databoxes from the output channel of a pipeline,
     ;; and spits the databoxes onto the :channel.
-    (pipeline parallel-count
-              output-ch
-              (map (fn [data] (handle-pipeline-data data xf)))
-              input-ch))
+    (pipelinef parallel-count
+               output-ch
+               (comp boxify check-cancelled-xf normalize-xf xf)
+               input-ch))
 
   (let [pipeline-ch (chain output-ch (box/filter #(not= % ::skipped)))
         data-count-atom (atom {:total 0
