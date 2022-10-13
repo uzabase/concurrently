@@ -351,7 +351,24 @@
   [parallel-count output-ch f input-ch & [options]]
   (make-concurrent-process :default parallel-count output-ch f input-ch options))
 
-(defn get-results
+(defn get-results!
+  [ch & [{catch-fn :catch finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
+  (go
+    (try
+      (loop [results []]
+        (log/debug "get-results loop")
+        (if-let [item (take-or-throw! ch timeout-ms context-name)]
+          (recur (conj results @item))
+          (box/success results)))
+      (catch Throwable ex
+        (log/debug "close")
+        (when catch-fn
+          (catch-fn ex))
+        (box/failure ex))
+      (finally
+        (cleanup-in-background ch finally-fn)))))
+
+(defn get-results!!
   "Safely read all data from a channel and return a vector containing all read data.
    the items read from a channel must be databoxes. The result vector contains 
    unboxed data of the read items. If an exception occurred while resolving read items, 
@@ -376,18 +393,9 @@
    'ch' will be read fully even if this function returns early before reading all data from 'ch',  
    because a go-block is launched automatically for reading 'ch' fully.
    So a pipeline backing the 'ch' never be stacked by never-read-data remained in a pipeline."
-  [ch & [{catch-fn :catch finally-fn :finally context-name :context-name timeout-ms :timeout-ms :or {context-name "none" timeout-ms 120000}}]]
-  @(<!! (go
-          (try
-            (loop [results []]
-              (log/debug "get-results loop")
-              (if-let [item (take-or-throw! ch timeout-ms context-name)]
-                (recur (conj results @item))
-                (box/success results)))
-            (catch Throwable ex
-              (log/debug "close")
-              (when catch-fn
-                (catch-fn ex))
-              (box/failure ex))
-            (finally
-              (cleanup-in-background ch finally-fn))))))
+  [ch & [options]]
+  @(<!! (get-results! ch options)))
+
+(defn ^:deprecated get-results
+  [ch & [options]]
+  (get-results!! ch options))

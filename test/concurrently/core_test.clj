@@ -1,5 +1,5 @@
 (ns concurrently.core_test
-  (:require [concurrently.core :refer [concurrent-process concurrent-process-blocking concurrently get-results cancel cleanup-in-background]]
+  (:require [concurrently.core :refer [concurrent-process concurrent-process-blocking concurrently get-results!! cancel cleanup-in-background]]
             [clojure.test :refer [deftest testing is]]
             [clojure.core.async :refer [chan to-chan! <!! timeout ]]
             [clojure.string :refer [upper-case]]
@@ -26,7 +26,7 @@
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
       (try
-        (let [results (get-results channel)]
+        (let [results (get-results!! channel)]
           (is (= ["A" "B" "C"] results)))
         (finally
           (cancel job)))))
@@ -47,7 +47,7 @@
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
       (try
-        (is (thrown? ExceptionInfo (get-results channel)))
+        (is (thrown? ExceptionInfo (get-results!! channel)))
         (<!! (timeout 3000))
         (is (nil? (<!! channel)))
         (finally
@@ -65,7 +65,7 @@
           data-coll ["a" "b" "c"]
           {:keys [channel] :as job} (concurrently context (to-chan! data-coll) test-options)]
       (try
-        (let [results (get-results channel)]
+        (let [results (get-results!! channel)]
           (is (has-same-key-values? (nth results 0) test-options))
           (is (has-same-key-values? (nth results 1) test-options))
           (is (has-same-key-values? (nth results 2) test-options)))
@@ -145,7 +145,7 @@
           {:keys [channel]} (concurrently context 
                                           (to-chan! data-coll) 
                                           {:ignore-error? true})]
-      (is (= ["a" "d" "e"] (get-results channel))))))
+      (is (= ["a" "d" "e"] (get-results!! channel))))))
 
 (deftest test-for-get-results
   (testing "catch block must be called if a first failure box is found"
@@ -164,8 +164,8 @@
                            :exception-thrown? false})
           {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
       (try
-        (get-results channel
-                     {:catch (fn [_] (swap! test-refs update :catch-called? (fn [_] true)))})
+        (get-results!! channel
+                       {:catch (fn [_] (swap! test-refs update :catch-called? (fn [_] true)))})
         (catch Exception ex
           (is :catch-test (:value (ex-data ex)))
           (swap! test-refs update :exception-thrown? (fn [_] true))))
@@ -183,8 +183,8 @@
           data-coll ["a" "b" "c"]
           finally-block-called? (atom false)
           {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
-      (get-results channel
-                   {:finally #(reset! finally-block-called? true)})
+      (get-results!! channel
+                     {:finally #(reset! finally-block-called? true)})
       (<!! (timeout 2000)) ;; wait for cleanup
       (is (true? @finally-block-called?))))
 
@@ -199,7 +199,7 @@
           data-coll ["a" "b" "c"]
           {:keys [channel]} (concurrently context (to-chan! data-coll) {})]
       (try
-        (get-results channel {:timeout-ms 500})
+        (get-results!! channel {:timeout-ms 500})
         (catch ExceptionInfo ex
           (is (= :concurrently.core/channel-timeout (:reason (ex-data ex)))))))))
 
@@ -223,7 +223,7 @@
                    pipeline-input-ch
                    {:ordered? false})
           {:keys [channel]} (concurrently context (to-chan! (range 0 10)) {})
-          results (get-results channel)]
+          results (get-results!! channel)]
       
       (log/info "results =" results)
       (is (= 10 (count results)))))
@@ -244,8 +244,27 @@
                    pipeline-input-ch
                    {:ordered? false})
           {:keys [channel]} (concurrently context (to-chan! (range 0 10)) {})
-          results (get-results channel)]
+          results (get-results!! channel)]
 
       (log/info "results =" results)
       (is (= 10 (count results)))
       (is (= 0 (last results))))))
+
+(deftest pipeline-filter-test
+  (testing "Can use 'filter' transducer on pipeline"
+    (let [pipeline-input-ch (chan)
+          pipeline-output-ch (chan)
+          context (concurrent-process-blocking
+                   3
+                   pipeline-output-ch
+                   (comp (box/filter (fn [{:keys [data]}] (even? data)))
+                         (box/map :data))
+                   pipeline-input-ch)
+          data-coll [1 2 3 4 5 6]
+          {:keys [channel] :as job} (concurrently context (to-chan! data-coll) {})]
+      
+      (is (= [2 4 6]
+             (try
+               (get-results!! channel)
+               (finally
+                 (cancel job))))))))
