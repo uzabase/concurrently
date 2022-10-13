@@ -204,26 +204,6 @@
   {:input-ch input-ch
    :ordered? ordered?})
 
-
-(defn- handle-pipeline-data
-  [{:keys [transaction-id] :as data} xf]
-  (log/debug "pipeline")
-  (cond
-    (data-end? data)
-    data
-
-    (job-cancelled? transaction-id)
-    (do
-      (log/debug (str "a job already is cancelled. transaction-id = " transaction-id))
-      (box/map data (fn [_] ::skipped)))
-
-    :else
-    (let [options (-> data
-                      (box/strip-default-keys)
-                      (dissoc :channel :transaction-id :context-name))]
-      (box/map data #(->> (sequence xf [{:data % :options options}])
-                          (first))))))
-
 (def boxify
   (map (fn [data] (box/box data))))
 
