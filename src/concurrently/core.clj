@@ -230,9 +230,6 @@
 (def check-cancelled-xf
   (map (fn [{:keys [transaction-id] :as boxed}]
          (cond
-           (data-end? boxed)
-           boxed
-
            (job-cancelled? transaction-id)
            (do
              (log/debug (str "a job already is cancelled. transaction-id = " transaction-id))
@@ -243,15 +240,10 @@
 
 (def normalize-xf
   (map (fn [boxed]
-         (cond
-           (data-end? boxed)
-           boxed
-
-           :else
-           (let [options (-> boxed
-                             (box/strip-default-keys)
-                             (dissoc :channel :transaction-id :context-name))]
-             (box/map boxed (fn [data] {:data data :options options})))))))
+         (let [options (-> boxed
+                           (box/strip-default-keys)
+                           (dissoc :channel :transaction-id :context-name))]
+           (box/map boxed (fn [value] {:data value :options options}))))))
 
 
 (def ^:private pipeline-ordered-fn {:blocking async/pipeline-blocking
