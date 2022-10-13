@@ -33,12 +33,12 @@
 (defprotocol Chainable
   (chain [source xf] [source xf ex-handler] "Create a new Chainable which have same type with 'source' and supplies all items from source applying xf on them."))
 
-(extend-type ManyToManyChannel 
+(extend-type ManyToManyChannel
   Chainable
-  (chain 
+  (chain
     ([source xf]
      (chain source xf nil))
-    
+
     ([source xf ex-handler]
      (let [next-ch (chan 1 xf ex-handler)]
        (go-loop []
@@ -107,11 +107,11 @@
   (cancel [self]
     (when transaction-id
       (swap! jobs disj transaction-id)))
-  
+
   Chainable
   (chain [source xf]
     (chain source xf nil))
-  
+
   (chain [source xf ex-handler]
     (update source
             :channel
@@ -161,9 +161,9 @@
                                (when-not (ensure counted)
                                  (alter current-concurrent-count inc)
                                  (commute counted (fn [_] true)))))
-          
+
           data-count (atom 0)]
-      
+
       ;; Registar a job.
       ;; Jobs can be cancelled by a `cancel` function of ConcurrentJob.
       (registar-job transaction-id)
@@ -234,14 +234,14 @@
   [pipeline-type]
   (case pipeline-type
     :blocking
-    (fn blocking-fn 
+    (fn blocking-fn
       ([n to xf from] (blocking-fn n to xf from true))
       ([n to xf from close?] (blocking-fn n to xf from close? nil))
-      ([n to xf from close? ex-handler] 
+      ([n to xf from close? ex-handler]
        (log/info "pipeline-unorderd blocking")
        (pipeline-unorderd n to xf from close? ex-handler :blocking)))
-    
-    (fn compute-fn 
+
+    (fn compute-fn
       ([n to xf from] (compute-fn n to xf from true))
       ([n to xf from close?] (compute-fn n to xf from close? nil))
       ([n to xf from close? ex-handler] (pipeline-unorderd n to xf from close? ex-handler :compute)))))
@@ -254,7 +254,7 @@
 
 (defn- make-concurrent-process
   [pipeline-type parallel-count output-ch xf input-ch {:keys [ordered?] :or {ordered? true}}]
-  (let [pipelinef (or (pipeline-fn pipeline-type ordered?) 
+  (let [pipelinef (or (pipeline-fn pipeline-type ordered?)
                       (throw (ex-info (str "no such pipeline-type: " pipeline-type)
                                       {:pipeline-type pipeline-type})))]
     ;; Start a concurrent pipeline backed by `pipeline-*` fns of core.async and
@@ -283,7 +283,7 @@
               (unregistar-job transaction-id)
               (dosync (alter current-concurrent-count dec))
               (close! ch))]
-      
+
       (go-loop []
         (when-let [{:keys [ignore-error? context-name transaction-id], out-ch :channel :as item-boxed}
                    (<! pipeline-ch)]
@@ -296,7 +296,7 @@
             (data-end? item-boxed)
             (when (or ordered?
                       (let [{:keys [received total]} (swap! data-count-atom assoc :total (:data-count item-boxed)
-                                                                                  :data-end-received? true)]
+                                                            :data-end-received? true)]
                         (= received total)))
               (close-channel out-ch context-name transaction-id))
 
